@@ -1,0 +1,13 @@
+{
+  "name": "Tabby — trip expense splitter",
+  "short_name": "Tabby",
+  "description": "Split trip expenses with your group, even offline.",
+  "start_url": "/trips",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
