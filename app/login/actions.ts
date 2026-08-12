@@ -30,8 +30,8 @@ export async function sendOtpCode(formData: FormData): Promise<ActionResult> {
 }
 
 export async function verifyOtpCode(email: string, token: string): Promise<ActionResult> {
-  if (!/^\d{6}$/.test(token.trim())) {
-    return { ok: false, error: "Enter the 6-digit code from the email." };
+  if (!/^\d{4,10}$/.test(token.trim())) {
+    return { ok: false, error: "Enter the code from the email." };
   }
 
   const supabase = await createClient();
