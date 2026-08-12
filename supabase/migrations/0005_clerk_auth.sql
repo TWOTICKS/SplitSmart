@@ -39,7 +39,15 @@ alter table trips drop constraint if exists trips_created_by_fkey;
 alter table trips alter column created_by type text using created_by::text;
 
 alter table members drop constraint if exists members_user_id_fkey;
+-- members_claim_trigger depends on this column (before update of user_id);
+-- Postgres won't let the type change while that dependency exists, so drop
+-- and recreate the trigger around it. The underlying function is generic
+-- (just compares old/new user_id) and needs no changes for the new type.
+drop trigger if exists members_claim_trigger on members;
 alter table members alter column user_id type text using user_id::text;
+create trigger members_claim_trigger
+  before update of user_id on members
+  for each row execute function check_member_claim();
 
 -- ---- is_trip_member: replaced in place, not dropped (see note above) ----
 
