@@ -20,6 +20,33 @@ export async function addGhostMember(tripId: string, formData: FormData): Promis
   return { ok: true };
 }
 
+/** Renames the signed-in user's own member row within this trip. */
+export async function updateMyDisplayName(tripId: string, formData: FormData): Promise<ActionResult> {
+  const displayName = String(formData.get("display_name") ?? "").trim();
+  if (displayName.length < 1 || displayName.length > 60) {
+    return { ok: false, error: "Enter a name." };
+  }
+
+  const { userId } = await auth();
+  if (!userId) return { ok: false, error: "Not signed in." };
+  const supabase = await createClient();
+
+  // Scoped to the caller's own row via user_id, not just trip_id — the
+  // broader members_update RLS policy would technically allow renaming
+  // anyone in the trip, but this action is specifically "rename yourself".
+  const { error } = await supabase
+    .from("members")
+    .update({ display_name: displayName })
+    .eq("trip_id", tripId)
+    .eq("user_id", userId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/trips/${tripId}`);
+  revalidatePath(`/trips/${tripId}/settings`);
+  revalidatePath(`/trips/${tripId}/balances`);
+  return { ok: true };
+}
+
 /**
  * Claim an unclaimed ghost member as the signed-in user. Joining a trip by
  * invite code always creates the user's own member row first (join_trip),

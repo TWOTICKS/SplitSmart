@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { addGhostMember, claimGhostMember } from "../members-actions";
+import { addGhostMember, claimGhostMember, updateMyDisplayName } from "../members-actions";
 import type { Member } from "@/lib/types";
 
 export function MembersPanel({
@@ -18,6 +18,8 @@ export function MembersPanel({
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [isClaiming, startClaiming] = useTransition();
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [isRenaming, startRenaming] = useTransition();
 
   const iAmAlreadyAMember = members.some((m) => m.user_id === myUserId);
 
@@ -29,15 +31,54 @@ export function MembersPanel({
             key={m.id}
             className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-800"
           >
-            <span className="flex items-center gap-2 text-sm">
-              {m.display_name}
-              {m.user_id === myUserId && <span className="text-xs text-zinc-500">(you)</span>}
-              {!m.user_id && (
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800">
-                  not on SplitSmart
-                </span>
-              )}
-            </span>
+            {m.user_id === myUserId && editingName ? (
+              <form
+                className="flex flex-1 items-center gap-2"
+                action={(formData) => {
+                  startRenaming(async () => {
+                    const result = await updateMyDisplayName(tripId, formData);
+                    if (result.ok) setEditingName(false);
+                    else setError(result.error ?? "Something went wrong.");
+                  });
+                }}
+              >
+                <input
+                  name="display_name"
+                  defaultValue={m.display_name}
+                  required
+                  maxLength={60}
+                  autoFocus
+                  className="h-9 flex-1 rounded-lg border border-zinc-300 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                />
+                <button type="submit" disabled={isRenaming} className="text-xs font-medium text-teal-700 dark:text-teal-400">
+                  {isRenaming ? "Saving…" : "Save"}
+                </button>
+                <button type="button" onClick={() => setEditingName(false)} className="text-xs text-zinc-500">
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <span className="flex items-center gap-2 text-sm">
+                {m.display_name}
+                {m.user_id === myUserId && (
+                  <>
+                    <span className="text-xs text-zinc-500">(you)</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditingName(true)}
+                      className="text-xs font-medium text-teal-700 dark:text-teal-400"
+                    >
+                      Rename
+                    </button>
+                  </>
+                )}
+                {!m.user_id && (
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800">
+                    not on SplitSmart
+                  </span>
+                )}
+              </span>
+            )}
             {!m.user_id && (
               <button
                 type="button"
