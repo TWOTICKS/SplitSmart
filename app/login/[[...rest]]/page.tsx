@@ -2,7 +2,11 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { SignIn } from "@clerk/nextjs";
 
-export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+// Catch-all: Clerk's <SignIn/> needs to control its own sub-paths (OAuth
+// callbacks, multi-step account creation like /login/create/sso-callback)
+// — a single fixed /login route 404s on those, since Next.js has nowhere
+// to send the extra path segments.
+export default async function LoginPage({ searchParams }: PageProps<"/login/[[...rest]]">) {
   const { userId } = await auth();
   const { next } = await searchParams;
   const nextPath = typeof next === "string" && next.startsWith("/") ? next : "/trips";
