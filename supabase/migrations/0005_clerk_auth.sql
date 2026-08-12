@@ -12,32 +12,38 @@
 --   2. Columns that stored a Supabase auth.users id can no longer be uuid
 --      foreign keys into auth.users — Clerk users don't live in that table
 --      at all. trips.created_by and members.user_id become plain text.
+--
+-- Written to be safe to re-run: every drop uses IF EXISTS, and
+-- is_trip_member is replaced in place (CREATE OR REPLACE) rather than
+-- dropped, since expenses_all / settlements_all / expense_payers_all /
+-- expense_splits_all also depend on it and aren't otherwise touched here —
+-- dropping it would take those down too (this is what failed the first
+-- time this migration ran).
 
--- ---- drop everything that touches the columns/functions being replaced --
+-- ---- drop the policies being replaced (IF EXISTS: safe to re-run) --------
 
-drop policy trips_select on trips;
-drop policy trips_update on trips;
-drop policy trips_insert on trips;
-drop policy trips_select_own on trips;
-drop policy members_select on members;
-drop policy members_insert on members;
-drop policy members_update on members;
-drop policy members_insert_creator_bootstrap on members;
-drop policy fx_rates_select on fx_rates;
-drop function is_trip_member(uuid);
-drop function join_trip(text);
+drop policy if exists trips_select on trips;
+drop policy if exists trips_update on trips;
+drop policy if exists trips_insert on trips;
+drop policy if exists trips_select_own on trips;
+drop policy if exists members_select on members;
+drop policy if exists members_insert on members;
+drop policy if exists members_update on members;
+drop policy if exists members_insert_creator_bootstrap on members;
+drop policy if exists fx_rates_select on fx_rates;
+drop function if exists join_trip(text);
 
 -- ---- column type changes -------------------------------------------------
 
-alter table trips drop constraint trips_created_by_fkey;
+alter table trips drop constraint if exists trips_created_by_fkey;
 alter table trips alter column created_by type text using created_by::text;
 
-alter table members drop constraint members_user_id_fkey;
+alter table members drop constraint if exists members_user_id_fkey;
 alter table members alter column user_id type text using user_id::text;
 
--- ---- re-create is_trip_member and policies using the Clerk JWT's `sub` --
+-- ---- is_trip_member: replaced in place, not dropped (see note above) ----
 
-create function is_trip_member(t uuid) returns boolean
+create or replace function is_trip_member(t uuid) returns boolean
 language sql security definer stable as $$
   select exists (
     select 1 from members m
@@ -71,7 +77,7 @@ create policy fx_rates_select on fx_rates for select
 -- ---- join_trip: display name now comes from the app (Clerk user data
 -- isn't queryable from Postgres the way auth.users was) --------------------
 
-create function join_trip(p_code text, p_display_name text) returns uuid
+create or replace function join_trip(p_code text, p_display_name text) returns uuid
 language plpgsql security definer as $$
 declare
   v_trip_id uuid;
