@@ -13,7 +13,17 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
-    console.error("auth callback: exchangeCodeForSession failed", { message: error.message, status: error.status });
+    const cookieHeader = request.headers.get("cookie") ?? "";
+    const cookieNames = cookieHeader
+      .split(";")
+      .map((c) => c.trim().split("=")[0])
+      .filter(Boolean);
+    console.error("auth callback: exchangeCodeForSession failed", {
+      message: error.message,
+      status: error.status,
+      cookieNames,
+      codeVerifierCookieCount: cookieNames.filter((n) => n.includes("code-verifier")).length,
+    });
   } else {
     console.error("auth callback: no code param in request", { url: request.url });
   }
