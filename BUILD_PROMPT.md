@@ -1,4 +1,4 @@
-# Build Prompt — "Tabby" (Splitwise clone for overseas trips)
+# Build Prompt — "SplitSmart" (Splitwise clone for overseas trips)
 
 This document is the complete build specification. Feed it to a coding agent as the prompt.
 It is written so that every ambiguous decision is already made. Where a rule affects money,

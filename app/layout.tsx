@@ -14,10 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tabby",
+  title: "SplitSmart",
   description: "Split trip expenses with your group, even offline.",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Tabby" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "SplitSmart" },
 };
 
 export const viewport: Viewport = {

@@ -34,7 +34,7 @@ export function MembersPanel({
               {m.user_id === myUserId && <span className="text-xs text-zinc-500">(you)</span>}
               {!m.user_id && (
                 <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800">
-                  not on Tabby
+                  not on SplitSmart
                 </span>
               )}
             </span>

@@ -1,4 +1,4 @@
--- Tabby schema. Money is always integer minor units. Currency is ISO-4217.
+-- SplitSmart schema. Money is always integer minor units. Currency is ISO-4217.
 -- See BUILD_PROMPT.md section 2-3 for the invariants this file enforces.
 
 create extension if not exists pgcrypto;

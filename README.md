@@ -1,4 +1,4 @@
-# Tabby
+# SplitSmart
 
 A trip-scoped shared expense splitter — see [BUILD_PROMPT.md](./BUILD_PROMPT.md) for the full
 spec this was built against. Installable PWA (Next.js + Supabase), $0/month hosting, works

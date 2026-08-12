@@ -1,10 +1,10 @@
-// Tabby service worker. Only precaches the static app shell (icons,
+// SplitSmart service worker. Only precaches the static app shell (icons,
 // manifest, offline fallback) — never authenticated page HTML, since that
 // would mean serving one user's cached trip data to whoever opens the app
 // next on a shared device. Actual trip data is local-first through Dexie
 // (see lib/offline/*), not the service worker cache.
 
-const CACHE_NAME = "tabby-shell-v1";
+const CACHE_NAME = "splitsmart-shell-v1";
 const SHELL_ASSETS = ["/manifest.json", "/offline.html", "/icons/icon.svg"];
 
 self.addEventListener("install", (event) => {

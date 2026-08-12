@@ -1,6 +1,6 @@
 {
-  "name": "Tabby — trip expense splitter",
-  "short_name": "Tabby",
+  "name": "SplitSmart — trip expense splitter",
+  "short_name": "SplitSmart",
   "description": "Split trip expenses with your group, even offline.",
   "start_url": "/trips",
   "scope": "/",

@@ -20,11 +20,11 @@ export interface OutboxItem {
   displaySpentAt: string;
 }
 
-class TabbyDB extends Dexie {
+class SplitSmartDB extends Dexie {
   outbox!: EntityTable<OutboxItem, "id">;
 
   constructor() {
-    super("tabby");
+    super("splitsmart");
     this.version(1).stores({
       outbox: "id, tripId, kind, createdAt",
     });
@@ -32,4 +32,4 @@ class TabbyDB extends Dexie {
 }
 
 // Dexie touches indexedDB at construction time, which doesn't exist during SSR.
-export const db = typeof window !== "undefined" ? new TabbyDB() : null;
+export const db = typeof window !== "undefined" ? new SplitSmartDB() : null;
