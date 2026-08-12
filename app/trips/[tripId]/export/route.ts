@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { formatMajor } from "@/lib/money";
 
@@ -8,11 +9,9 @@ function csvCell(value: string): string {
 
 export async function GET(_request: Request, { params }: RouteContext<"/trips/[tripId]/export">) {
   const { tripId } = await params;
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const [{ data: trip }, { data: members }, { data: expenses }, { data: settlements }] = await Promise.all([
     supabase.from("trips").select("name").eq("id", tripId).single(),

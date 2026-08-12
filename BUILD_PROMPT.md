@@ -14,7 +14,7 @@ it is stated as a testable invariant, not a preference.
 | Hosting | **Vercel (app) + Neon or Supabase Postgres (data)**, both free tier | US$0 at this scale, global edge, TLS handled, no ops. |
 | Host on the laptop from overseas? | **No.** | Technically possible (Cloudflare Tunnel → laptop). Practically: laptop sleeps/lid closes, home ISP reboots, power cuts, dynamic IP, no one can settle a bill at 11pm because your laptop is asleep in another timezone. It also puts the group's data on an unbacked-up consumer machine. Cost saved: $0. Do not do it. |
 | Money type | **Integer minor units (cents)**, never floats | `0.1 + 0.2 !== 0.3`. Any float in a money path is a bug. |
-| Accounts | **Email one-time code** (Supabase Auth) | No passwords to store, reset, or leak. A typed 6-digit code, not a clickable link — a link has to survive a redirect through the email provider back to the app, and providers that auto-visit links to scan for phishing/malware silently break that redirect-based flow. A typed code has no hop to break. |
+| Accounts | **Clerk**, connected to Supabase via Third-Party Auth | Supabase's own email auth (magic link, then a typed one-time code with a custom email hook) fought a long series of real-world failures: redirect/cookie fragility, Vercel's Deployment Protection interposing itself, and Resend's sender-domain-verification requirement blocking delivery to anyone but the account owner. Clerk owns email delivery end-to-end and removes that whole category of problems. RLS still runs in Postgres — Supabase just trusts Clerk's JWT instead of issuing its own. |
 
 Deviating from any of the above requires an explicit instruction from the user.
 
@@ -176,7 +176,12 @@ These are the invariants that make a balance sheet trustworthy. A UI bug must no
 create a ledger that does not sum. Do not move these checks into application code.
 
 ### Row-level security
-Enable RLS on every table. The single predicate, expressed once as a SQL helper function:
+Enable RLS on every table. The single predicate, expressed once as a SQL helper function. Shown
+below as originally written against Supabase's own auth (`auth.uid()`); after the move to Clerk
+(section 0), every `auth.uid()` became `(select auth.jwt()->>'sub')` instead — `auth.uid()`
+casts the JWT's `sub` claim to `uuid`, and Clerk's user ids ("user_2abc...") aren't UUIDs, so it
+raises rather than returning null. See `supabase/migrations/0005_clerk_auth.sql` for the actual
+current definitions.
 
 ```sql
 create function is_trip_member(t uuid) returns boolean
@@ -309,7 +314,7 @@ people add expenses at the table.
 
 ## 5. Auth and joining
 
-- Email one-time-code sign-in (not a clickable link — see section 0). No passwords anywhere in the codebase.
+- Clerk handles sign-in entirely (see section 0 for why it replaced Supabase's own auth). No passwords anywhere in this codebase — Clerk owns that.
 - Trip invite: share a link `https://<app>/join/<code>`. Opening it while signed in shows
   "Join <trip name>?" → creates a `members` row.
 - **Ghost members**: added by name alone so you can start splitting before everyone has
@@ -355,7 +360,8 @@ Keep it to six. Every additional screen is a screen to maintain.
 ```
 Next.js (App Router, TypeScript, strict)   — UI + a thin API surface
 Tailwind CSS                               — styling, no component library
-Supabase                                   — Postgres + Auth + RLS + Realtime
+Supabase                                   — Postgres + RLS + Realtime
+Clerk                                      — auth (Supabase Third-Party Auth trusts its JWT)
 Dexie (IndexedDB wrapper)                  — offline store + sync queue
 next-pwa or a hand-written service worker  — installability + app-shell cache
 Vitest + fast-check                        — unit and property tests

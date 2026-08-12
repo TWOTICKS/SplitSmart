@@ -1,31 +1,32 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClerkClient } from "@clerk/backend";
+import { clerk } from "@clerk/testing/playwright";
 import type { Page } from "@playwright/test";
 
 /**
- * Signs a Playwright page in as a fresh test user, using the exact same
- * link a real magic-link email would contain — no cookie-forging, no route
- * bypassed. Requires SUPABASE_SERVICE_ROLE_KEY (server-only, test env only;
- * never expose this key to the browser or commit it) to mint the link,
- * since generating a sign-in link for an arbitrary email requires admin
- * privileges that the app itself never has.
+ * Creates a fresh test user via Clerk's Backend API (needs CLERK_SECRET_KEY
+ * — test-only, never expose this to the browser or commit it) with a
+ * pre-verified email and a throwaway password, then signs the given page in
+ * as that user through Clerk's own Playwright testing helper. This replaces
+ * the old Supabase admin.generateLink approach from before the Clerk
+ * migration — Clerk owns auth now, so tests authenticate through Clerk.
  */
 export async function signInAsNewUser(page: Page, emailPrefix: string): Promise<string> {
   const email = `${emailPrefix}+${Date.now()}@example.com`;
+  const password = `Test-${Date.now()}-!aA1`;
 
-  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { autoRefreshToken: false, persistSession: false },
+  const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+  await clerkClient.users.createUser({
+    emailAddress: [email],
+    password,
+    skipPasswordChecks: true,
   });
 
-  const { data, error } = await admin.auth.admin.generateLink({
-    type: "magiclink",
-    email,
-    options: { redirectTo: `${process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000"}/auth/callback` },
+  await page.goto("/login");
+  await clerk.signIn({
+    page,
+    signInParams: { strategy: "password", identifier: email, password },
   });
-  if (error || !data.properties?.action_link) {
-    throw new Error(`could not generate a sign-in link for the test user: ${error?.message}`);
-  }
-
-  await page.goto(data.properties.action_link);
+  await page.goto("/trips");
   await page.waitForURL("**/trips");
   return email;
 }

@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { SettingsForm } from "./settings-form";
 import { HomeCurrencyForm } from "./home-currency-form";
@@ -8,11 +9,9 @@ import type { Member, Trip } from "@/lib/types";
 
 export default async function TripSettingsPage({ params }: PageProps<"/trips/[tripId]/settings">) {
   const { tripId } = await params;
+  const { userId } = await auth();
+  if (!userId) redirect("/login");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const [{ data: trip }, { data: members }] = await Promise.all([
     supabase.from("trips").select("*").eq("id", tripId).single<Trip>(),
@@ -24,7 +23,7 @@ export default async function TripSettingsPage({ params }: PageProps<"/trips/[tr
     <div className="flex flex-col gap-8">
       <section>
         <h2 className="mb-3 text-sm font-semibold text-zinc-500">Members</h2>
-        <MembersPanel tripId={tripId} members={members ?? []} myUserId={user.id} />
+        <MembersPanel tripId={tripId} members={members ?? []} myUserId={userId} />
       </section>
 
       <InviteCodeCard code={trip.invite_code} />

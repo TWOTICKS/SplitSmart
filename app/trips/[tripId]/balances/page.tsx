@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTripBalances, getPairwiseDebts, getSettleUpPlan } from "@/lib/balances";
 import { formatMoney } from "@/lib/format";
@@ -7,11 +8,9 @@ import { SettleUpList } from "./settle-up-list";
 
 export default async function BalancesPage({ params }: PageProps<"/trips/[tripId]/balances">) {
   const { tripId } = await params;
+  const { userId } = await auth();
+  if (!userId) redirect("/login");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const { data: trip } = await supabase.from("trips").select("*").eq("id", tripId).single<Trip>();
   if (!trip) notFound();
@@ -67,7 +66,7 @@ export default async function BalancesPage({ params }: PageProps<"/trips/[tripId
               >
                 <span className="flex items-center gap-2 font-medium">
                   {m.display_name}
-                  {m.user_id === user.id && <span className="text-xs font-normal text-zinc-500">(you)</span>}
+                  {m.user_id === userId && <span className="text-xs font-normal text-zinc-500">(you)</span>}
                 </span>
                 {net === 0 ? (
                   <span className="text-sm text-zinc-500">settled up</span>

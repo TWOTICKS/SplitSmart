@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { formatMajor } from "@/lib/money";
 import { ExpenseForm, type ExpenseFormInitial } from "../../expense-form";
@@ -16,11 +17,9 @@ interface SplitRow {
 
 export default async function EditExpensePage({ params }: PageProps<"/trips/[tripId]/expense/[expenseId]/edit">) {
   const { tripId, expenseId } = await params;
+  const { userId } = await auth();
+  if (!userId) redirect("/login");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const [{ data: trip }, { data: members }, { data: expense }] = await Promise.all([
     supabase.from("trips").select("*").eq("id", tripId).single<Trip>(),
@@ -34,7 +33,7 @@ export default async function EditExpensePage({ params }: PageProps<"/trips/[tri
   ]);
   if (!trip || !members || !expense || expense.deleted_at) notFound();
 
-  const me = members.find((m) => m.user_id === user.id);
+  const me = members.find((m) => m.user_id === userId);
   if (!me) redirect(`/trips/${tripId}/settings`);
 
   const amountMajor = formatMajor(

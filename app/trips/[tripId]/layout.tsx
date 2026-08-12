@@ -1,16 +1,15 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { TripTabs } from "./trip-tabs";
 import { SyncBanner } from "./sync-banner";
 
 export default async function TripLayout({ children, params }: LayoutProps<"/trips/[tripId]">) {
   const { tripId } = await params;
+  const { userId } = await auth();
+  if (!userId) redirect("/login");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const { data: trip } = await supabase.from("trips").select("*").eq("id", tripId).single();
   if (!trip) notFound();

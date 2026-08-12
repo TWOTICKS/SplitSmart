@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { SignOutButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { getTripBalances } from "@/lib/balances";
 import { formatMoney } from "@/lib/format";
@@ -7,11 +9,9 @@ import type { Trip } from "@/lib/types";
 import { TripsFab } from "./trips-fab";
 
 export default async function TripsPage() {
+  const { userId } = await auth();
+  if (!userId) redirect("/login");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const { data: trips, error } = await supabase
     .from("trips")
@@ -24,7 +24,7 @@ export default async function TripsPage() {
   const tripsWithBalance = await Promise.all(
     (trips ?? []).map(async (trip: Trip) => {
       const { members, nets } = await getTripBalances(supabase, trip.id, trip.home_currency);
-      const me = members.find((m) => m.user_id === user.id);
+      const me = members.find((m) => m.user_id === userId);
       const myNet = me ? nets.get(me.id) ?? 0 : 0;
       return { trip, memberCount: members.length, myNet };
     })
@@ -34,11 +34,11 @@ export default async function TripsPage() {
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6 pb-24">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Your trips</h1>
-        <form action="/auth/signout" method="post">
-          <button type="submit" className="text-sm text-zinc-500 underline underline-offset-2">
+        <SignOutButton redirectUrl="/login">
+          <button type="button" className="text-sm text-zinc-500 underline underline-offset-2">
             Sign out
           </button>
-        </form>
+        </SignOutButton>
       </div>
 
       {tripsWithBalance.length === 0 && (

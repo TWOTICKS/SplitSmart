@@ -1,15 +1,14 @@
 import { notFound, redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { ExpenseForm } from "../expense-form";
 import type { Member, Trip } from "@/lib/types";
 
 export default async function NewExpensePage({ params }: PageProps<"/trips/[tripId]/expense/new">) {
   const { tripId } = await params;
+  const { userId } = await auth();
+  if (!userId) redirect("/login");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const [{ data: trip }, { data: members }] = await Promise.all([
     supabase.from("trips").select("*").eq("id", tripId).single<Trip>(),
@@ -17,7 +16,7 @@ export default async function NewExpensePage({ params }: PageProps<"/trips/[trip
   ]);
   if (!trip || !members) notFound();
 
-  const me = members.find((m) => m.user_id === user.id);
+  const me = members.find((m) => m.user_id === userId);
   if (!me) redirect(`/trips/${tripId}/settings`);
 
   return (

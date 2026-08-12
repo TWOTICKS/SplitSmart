@@ -1,17 +1,17 @@
 import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { JoinConfirmForm } from "./join-confirm-form";
 
 export default async function JoinByLinkPage({ params }: PageProps<"/join/[code]">) {
   const { code } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId } = await auth();
 
-  if (!user) {
+  if (!userId) {
     redirect(`/login?next=${encodeURIComponent(`/join/${code}`)}`);
   }
+
+  const supabase = await createClient();
 
   const { data: tripName } = await supabase.rpc("trip_name_for_code", { p_code: code });
 

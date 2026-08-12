@@ -1,31 +1,25 @@
 # SplitSmart
 
 A trip-scoped shared expense splitter — see [BUILD_PROMPT.md](./BUILD_PROMPT.md) for the full
-spec this was built against. Installable PWA (Next.js + Supabase), $0/month hosting, works
-offline.
+spec this was built against. Installable PWA (Next.js + Supabase + Clerk), works offline.
 
 ## Setup
 
 1. **Create a Supabase project** at [supabase.com](https://supabase.com) (pick the region
    closest to where the group actually travels — `ap-southeast-1` for Singapore-based users).
-2. **Run the migrations** — in the Supabase SQL editor, run the two files in
-   `supabase/migrations/` in order (`0001_init.sql`, then `0002_expense_writes.sql`). Or via the
-   Supabase CLI: `supabase db push`.
-3. **Enable email auth** — it's on by default. No other provider is needed; the app signs
-   people in with an emailed 6-digit one-time code (not a clickable link — see the note
-   at the bottom of this file for why).
-4. **Wire up the Send Email Auth Hook** so the code actually shows up in the email — Supabase's
-   own dashboard-configured templates weren't reliably including it, so this app sends that
-   email itself instead:
-   - Sign up at [resend.com](https://resend.com) (free tier), create an API key.
-   - Deploy this app first (see Deploying below) so you have a live URL, or use `ngrok`/similar
-     to expose `localhost:3000` if testing locally — Supabase needs to reach this endpoint.
-   - In Supabase → **Authentication → Hooks → Send Email**, enable it and set the URL to
-     `https://<your-app-url>/api/auth-email-hook`. Supabase generates a signing secret — copy it.
-   - Set `SUPABASE_AUTH_HOOK_SECRET` (the secret Supabase gave you) and `RESEND_API_KEY` (from
-     Resend) as env vars — locally in `.env.local`, and in Vercel's project settings for
-     production. Both are server-only; never prefix them with `NEXT_PUBLIC_`.
-5. **Copy the env file** and fill in your project's URL and anon key (Project Settings → API):
+2. **Run the migrations** — in the Supabase SQL editor, run the files in `supabase/migrations/`
+   **in order** (`0001` through `0005`). Or via the Supabase CLI: `supabase db push`.
+3. **Create a Clerk app** at [clerk.com](https://clerk.com) (free tier). Grab the **Publishable
+   key** and **Secret key** from its API Keys page.
+4. **Connect Clerk to Supabase as a Third-Party Auth provider** — this is what lets Supabase's
+   Row Level Security trust a Clerk-issued sign-in, instead of Supabase's own auth system:
+   - In Clerk's dashboard, find the **Supabase integration** (under Integrations) and enable it.
+     It gives you a domain to use.
+   - In Supabase → **Authentication → Sign In / Providers → Third Party Auth**, add Clerk and
+     paste that domain in.
+   - Without this step, every database request will be rejected — Clerk's JWTs won't be
+     recognized as valid sessions.
+5. **Copy the env file** and fill in your Supabase and Clerk keys:
    ```bash
    cp .env.local.example .env.local
    ```
@@ -38,24 +32,26 @@ offline.
 
 ## Deploying
 
-Push to GitHub, import the repo on [Vercel](https://vercel.com/new), and set the same two env
-vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) in the Vercel project
-settings. **Also check Vercel's Deployment Protection setting (Settings → Deployment
-Protection) and make sure Production is set to Public** — if it's protected, visitors get
-Vercel's own login wall in front of the app, which is not what you want for something you're
-sharing with friends. Free tier on both sides covers this app with enormous headroom — cost at
-rest is $0/month.
+Push to GitHub, import the repo on [Vercel](https://vercel.com/new), and set the four env vars
+from `.env.local.example` in the Vercel project settings. **Also check Vercel's Deployment
+Protection setting (Settings → Deployment Protection) and make sure Production is set to
+Public** — if it's protected, visitors get Vercel's own login wall in front of the app, on top
+of Clerk's, which is not what you want for something you're sharing with friends.
+
+Cost at rest: Supabase and Vercel free tiers cover this app easily; Clerk's free tier covers up
+to 10,000 monthly active users.
 
 ## Testing
 
 ```bash
 npm test          # lib/money.ts and lib/expense-builder.ts — pure, no backend needed
-npm run test:e2e  # Playwright happy-path + offline-sync — needs a real Supabase project
+npm run test:e2e  # Playwright happy-path + offline-sync — needs real Supabase + Clerk projects
 ```
 
-The E2E suite needs `SUPABASE_SERVICE_ROLE_KEY` set (test-only — never expose this to the
-browser or commit it) so it can mint real sign-in links for disposable test users via
-`supabase.auth.admin.generateLink`, the same mechanism a production magic link uses.
+The E2E suite needs `CLERK_SECRET_KEY` set (already required above) so it can create disposable
+test users via Clerk's Backend API and sign them in through
+[`@clerk/testing`](https://clerk.com/docs/testing/playwright/overview)'s Playwright helper,
+rather than driving Clerk's real sign-in UI by hand.
 
 ## Architecture notes worth knowing before you touch the code
 
@@ -76,17 +72,14 @@ browser or commit it) so it can mint real sign-in links for disposable test user
   consistent transaction.
 - Settlements are recorded directly in the trip's home currency (rate always 1) —
   foreign-currency settlements were left out; add if a user actually asks for one.
-- **Sign-in uses a typed one-time code, not a clickable magic link.** A link-based flow has to
-  survive a round trip through the email provider and back, all while a browser-stored PKCE
-  cookie stays intact across that hop — and several real-world things break that: some email
-  providers auto-visit links with a scanner bot before the user clicks, Vercel's Deployment
-  Protection (if left on) inserts its own auth wall in the middle of the hop, and clicking an
-  email link from within an email app's built-in browser puts you in a different cookie jar
-  than the one that requested the code in the first place. A typed code sidesteps all of it —
-  the browser that requests it is, by construction, the one that submits it.
-- **The sign-in email is sent by this app, not Supabase's built-in template system**
-  (`app/api/auth-email-hook`), via a Supabase "Send Email" Auth Hook. Supabase's own
-  dashboard-configured email template kept sending its default link-only design regardless of
-  what the template editor showed was saved — this hook sidesteps that entirely by building and
-  sending the email (through Resend) ourselves, so what's in the email is guaranteed to match
-  what the code actually needs.
+- **Auth is Clerk, not Supabase's own auth system** (`supabase/migrations/0005_clerk_auth.sql`
+  has the full story). This app originally used Supabase's built-in email sign-in, first as a
+  clickable magic link, then as a typed one-time code with a custom Resend-based email hook —
+  both fought a long series of real-world issues (redirect/cookie fragility, Vercel's
+  Deployment Protection interposing itself, Resend's sender-domain-verification requirement
+  blocking delivery to anyone but the account owner). Clerk was adopted because it owns email
+  delivery end-to-end, removing that whole category of problems. Two consequences worth
+  knowing if you're reading the schema: `auth.uid()` doesn't work anymore (Clerk's user ids
+  aren't UUIDs, and that helper casts to one) — RLS policies use `(select auth.jwt()->>'sub')`
+  instead; and `members.user_id` / `trips.created_by` are `text`, not `uuid` foreign keys into
+  `auth.users`, since Clerk users don't live in that table.

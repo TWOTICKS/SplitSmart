@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/format";
 import type { Expense, Member } from "@/lib/types";
@@ -16,11 +17,9 @@ interface SplitRow {
 
 export default async function ExpenseDetailPage({ params }: PageProps<"/trips/[tripId]/expense/[expenseId]">) {
   const { tripId, expenseId } = await params;
+  const { userId } = await auth();
+  if (!userId) redirect("/login");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const [{ data: expense }, { data: members }] = await Promise.all([
     supabase

@@ -3,6 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { currentUser } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 
 const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // no 0/O/1/I — avoids ambiguity when read aloud
@@ -28,11 +29,9 @@ export async function createTrip(formData: FormData): Promise<ActionResult> {
   if (name.length < 1 || name.length > 80) return { ok: false, error: "Trip name is required." };
   if (!/^[A-Z]{3}$/.test(homeCurrency)) return { ok: false, error: "Pick a home currency." };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) return { ok: false, error: "Not signed in." };
+  const supabase = await createClient();
 
   let tripId: string | null = null;
   // invite_code is globally unique; retry a couple of times on collision (birthday-bound, effectively never happens)
@@ -58,7 +57,8 @@ export async function createTrip(formData: FormData): Promise<ActionResult> {
   }
   if (!tripId) return { ok: false, error: "Could not create trip, please try again." };
 
-  const displayName = user.email?.split("@")[0] ?? "Me";
+  const displayName =
+    user.firstName ?? user.primaryEmailAddress?.emailAddress.split("@")[0] ?? "Me";
   const { error: memberError } = await supabase
     .from("members")
     .insert({ trip_id: tripId, user_id: user.id, display_name: displayName });
@@ -72,8 +72,12 @@ export async function joinTripByCode(formData: FormData): Promise<ActionResult> 
   const code = String(formData.get("code") ?? "").trim();
   if (code.length < 4) return { ok: false, error: "Enter the invite code." };
 
+  const user = await currentUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+  const displayName = user.firstName ?? user.primaryEmailAddress?.emailAddress.split("@")[0] ?? "Member";
+
   const supabase = await createClient();
-  const { data: tripId, error } = await supabase.rpc("join_trip", { p_code: code });
+  const { data: tripId, error } = await supabase.rpc("join_trip", { p_code: code, p_display_name: displayName });
   if (error) return { ok: false, error: "That code didn't match a trip." };
 
   revalidatePath("/trips");

@@ -1,28 +1,16 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
+// Supabase's Third-Party Auth support: Clerk issues the JWT, Supabase
+// validates it (once Clerk is registered as a provider in the Supabase
+// dashboard) and maps it to the "authenticated" role for RLS. No cookie
+// adapter needed here — Clerk owns the session, not Supabase.
 export async function createClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
+  return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            for (const { name, value, options } of cookiesToSet) {
-              cookieStore.set(name, value, options);
-            }
-          } catch {
-            // called from a Server Component that can't set cookies; the
-            // middleware below refreshes the session on every request instead.
-          }
-        },
-      },
+      accessToken: async () => (await auth()).getToken(),
     }
   );
 }

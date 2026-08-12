@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/app/trips/actions";
 
@@ -30,17 +31,15 @@ export async function addGhostMember(tripId: string, formData: FormData): Promis
  * The DB trigger separately blocks re-claiming an already-claimed member.
  */
 export async function claimGhostMember(tripId: string, ghostMemberId: string): Promise<ActionResult> {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, error: "Not signed in." };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Not signed in." };
 
   const { data: myMember, error: myMemberError } = await supabase
     .from("members")
     .select("id")
     .eq("trip_id", tripId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
   if (myMemberError) return { ok: false, error: myMemberError.message };
   if (!myMember) return { ok: false, error: "You must join this trip before claiming a member." };
@@ -63,7 +62,7 @@ export async function claimGhostMember(tripId: string, ghostMemberId: string): P
 
   const { error: claimError } = await supabase
     .from("members")
-    .update({ user_id: user.id })
+    .update({ user_id: userId })
     .eq("id", ghostMemberId)
     .is("user_id", null);
   if (claimError) return { ok: false, error: claimError.message };

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { uuidv7 } from "uuidv7";
+import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { resolveExpense, ExpenseValidationError, type ExpenseFormInput } from "@/lib/expense-builder";
 import { getLatestFxRate } from "@/lib/fx";
@@ -17,11 +18,9 @@ export interface ExpenseSubmission extends ExpenseFormInput {
 }
 
 export async function saveExpense(tripId: string, submission: ExpenseSubmission): Promise<ActionResult & { id?: string }> {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, error: "Not signed in." };
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Not signed in." };
 
   if (submission.description.trim().length < 1 || submission.description.trim().length > 140) {
     return { ok: false, error: "Description must be 1-140 characters." };
