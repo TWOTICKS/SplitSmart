@@ -14,7 +14,7 @@ it is stated as a testable invariant, not a preference.
 | Hosting | **Vercel (app) + Neon or Supabase Postgres (data)**, both free tier | US$0 at this scale, global edge, TLS handled, no ops. |
 | Host on the laptop from overseas? | **No.** | Technically possible (Cloudflare Tunnel → laptop). Practically: laptop sleeps/lid closes, home ISP reboots, power cuts, dynamic IP, no one can settle a bill at 11pm because your laptop is asleep in another timezone. It also puts the group's data on an unbacked-up consumer machine. Cost saved: $0. Do not do it. |
 | Money type | **Integer minor units (cents)**, never floats | `0.1 + 0.2 !== 0.3`. Any float in a money path is a bug. |
-| Accounts | **Email magic link** (Supabase Auth) | No passwords to store, reset, or leak. Works on any device abroad. |
+| Accounts | **Email one-time code** (Supabase Auth) | No passwords to store, reset, or leak. A typed 6-digit code, not a clickable link — a link has to survive a redirect through the email provider back to the app, and providers that auto-visit links to scan for phishing/malware silently break that redirect-based flow. A typed code has no hop to break. |
 
 Deviating from any of the above requires an explicit instruction from the user.
 
@@ -309,7 +309,7 @@ people add expenses at the table.
 
 ## 5. Auth and joining
 
-- Magic-link email sign-in. No passwords anywhere in the codebase.
+- Email one-time-code sign-in (not a clickable link — see section 0). No passwords anywhere in the codebase.
 - Trip invite: share a link `https://<app>/join/<code>`. Opening it while signed in shows
   "Join <trip name>?" → creates a `members` row.
 - **Ghost members**: added by name alone so you can start splitting before everyone has

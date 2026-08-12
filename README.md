@@ -12,7 +12,8 @@ offline.
    `supabase/migrations/` in order (`0001_init.sql`, then `0002_expense_writes.sql`). Or via the
    Supabase CLI: `supabase db push`.
 3. **Enable email auth** — it's on by default. No other provider is needed; the app signs
-   people in with a magic link only.
+   people in with an emailed 6-digit one-time code (not a clickable link — see the note
+   at the bottom of this file for why).
 4. **Copy the env file** and fill in your project's URL and anon key (Project Settings → API):
    ```bash
    cp .env.local.example .env.local
@@ -27,11 +28,12 @@ offline.
 ## Deploying
 
 Push to GitHub, import the repo on [Vercel](https://vercel.com/new), and set the same two env
-vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) plus
-`NEXT_PUBLIC_SITE_URL` (your Vercel URL, used to build the magic-link redirect) in the Vercel
-project settings. Also add that URL to Supabase's Auth → URL Configuration → Redirect URLs
-(`https://<your-app>.vercel.app/auth/callback`). Free tier on both sides covers this app with
-enormous headroom — cost at rest is $0/month.
+vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) in the Vercel project
+settings. **Also check Vercel's Deployment Protection setting (Settings → Deployment
+Protection) and make sure Production is set to Public** — if it's protected, visitors get
+Vercel's own login wall in front of the app, which is not what you want for something you're
+sharing with friends. Free tier on both sides covers this app with enormous headroom — cost at
+rest is $0/month.
 
 ## Testing
 
@@ -63,3 +65,11 @@ browser or commit it) so it can mint real sign-in links for disposable test user
   consistent transaction.
 - Settlements are recorded directly in the trip's home currency (rate always 1) —
   foreign-currency settlements were left out; add if a user actually asks for one.
+- **Sign-in uses a typed one-time code, not a clickable magic link.** A link-based flow has to
+  survive a round trip through the email provider and back, all while a browser-stored PKCE
+  cookie stays intact across that hop — and several real-world things break that: some email
+  providers auto-visit links with a scanner bot before the user clicks, Vercel's Deployment
+  Protection (if left on) inserts its own auth wall in the middle of the hop, and clicking an
+  email link from within an email app's built-in browser puts you in a different cookie jar
+  than the one that requested the code in the first place. A typed code sidesteps all of it —
+  the browser that requests it is, by construction, the one that submits it.

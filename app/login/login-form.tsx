@@ -1,29 +1,95 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { sendMagicLink } from "./actions";
+import { useRouter } from "next/navigation";
+import { sendOtpCode, verifyOtpCode } from "./actions";
 
 export function LoginForm({ next }: { next?: string }) {
-  const [status, setStatus] = useState<"idle" | "sent" | "error">("idle");
+  const router = useRouter();
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  function submitEmail(formData: FormData) {
+    const value = String(formData.get("email") ?? "").trim();
+    setErrorMessage("");
+    startTransition(async () => {
+      const result = await sendOtpCode(formData);
+      if (result.ok) {
+        setEmail(value);
+        setStep("code");
+      } else {
+        setErrorMessage(result.error ?? "Something went wrong.");
+      }
+    });
+  }
+
+  function submitCode() {
+    setErrorMessage("");
+    startTransition(async () => {
+      const result = await verifyOtpCode(email, code);
+      if (result.ok) {
+        router.push(next ?? "/trips");
+        router.refresh();
+      } else {
+        setErrorMessage(result.error ?? "Something went wrong.");
+      }
+    });
+  }
+
+  if (step === "code") {
+    return (
+      <div className="flex w-full max-w-sm flex-col gap-4">
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          We sent a 6-digit code to <strong>{email}</strong>. Enter it below.
+        </p>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Code</span>
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder="123456"
+            className="h-11 rounded-lg border border-zinc-300 bg-white px-3 text-center text-lg tracking-[0.3em] dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </label>
+        {errorMessage && (
+          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+            {errorMessage}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={submitCode}
+          disabled={isPending || code.length !== 6}
+          className="h-11 rounded-lg bg-teal-700 font-medium text-white disabled:opacity-60"
+        >
+          {isPending ? "Verifying…" : "Verify code"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStep("email");
+            setCode("");
+            setErrorMessage("");
+          }}
+          className="text-sm text-zinc-500 underline underline-offset-2"
+        >
+          Use a different email
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form
       className="flex w-full max-w-sm flex-col gap-4"
-      action={(formData) => {
-        startTransition(async () => {
-          const result = await sendMagicLink(formData);
-          if (result.ok) {
-            setStatus("sent");
-          } else {
-            setStatus("error");
-            setErrorMessage(result.error ?? "Something went wrong.");
-          }
-        });
-      }}
+      action={(formData) => submitEmail(formData)}
     >
-      {next && <input type="hidden" name="next" value={next} />}
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Email</span>
         <input
@@ -41,14 +107,9 @@ export function LoginForm({ next }: { next?: string }) {
         disabled={isPending}
         className="h-11 rounded-lg bg-teal-700 font-medium text-white disabled:opacity-60"
       >
-        {isPending ? "Sending…" : "Send magic link"}
+        {isPending ? "Sending…" : "Send code"}
       </button>
-      {status === "sent" && (
-        <p className="text-sm text-teal-700 dark:text-teal-400" role="status">
-          Check your email for a sign-in link.
-        </p>
-      )}
-      {status === "error" && (
+      {errorMessage && (
         <p className="text-sm text-red-600 dark:text-red-400" role="alert">
           {errorMessage}
         </p>
