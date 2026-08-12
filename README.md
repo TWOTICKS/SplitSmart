@@ -14,11 +14,22 @@ offline.
 3. **Enable email auth** — it's on by default. No other provider is needed; the app signs
    people in with an emailed 6-digit one-time code (not a clickable link — see the note
    at the bottom of this file for why).
-4. **Copy the env file** and fill in your project's URL and anon key (Project Settings → API):
+4. **Wire up the Send Email Auth Hook** so the code actually shows up in the email — Supabase's
+   own dashboard-configured templates weren't reliably including it, so this app sends that
+   email itself instead:
+   - Sign up at [resend.com](https://resend.com) (free tier), create an API key.
+   - Deploy this app first (see Deploying below) so you have a live URL, or use `ngrok`/similar
+     to expose `localhost:3000` if testing locally — Supabase needs to reach this endpoint.
+   - In Supabase → **Authentication → Hooks → Send Email**, enable it and set the URL to
+     `https://<your-app-url>/api/auth-email-hook`. Supabase generates a signing secret — copy it.
+   - Set `SUPABASE_AUTH_HOOK_SECRET` (the secret Supabase gave you) and `RESEND_API_KEY` (from
+     Resend) as env vars — locally in `.env.local`, and in Vercel's project settings for
+     production. Both are server-only; never prefix them with `NEXT_PUBLIC_`.
+5. **Copy the env file** and fill in your project's URL and anon key (Project Settings → API):
    ```bash
    cp .env.local.example .env.local
    ```
-5. **Install and run**:
+6. **Install and run**:
    ```bash
    npm install
    npm run dev
@@ -73,3 +84,9 @@ browser or commit it) so it can mint real sign-in links for disposable test user
   email link from within an email app's built-in browser puts you in a different cookie jar
   than the one that requested the code in the first place. A typed code sidesteps all of it —
   the browser that requests it is, by construction, the one that submits it.
+- **The sign-in email is sent by this app, not Supabase's built-in template system**
+  (`app/api/auth-email-hook`), via a Supabase "Send Email" Auth Hook. Supabase's own
+  dashboard-configured email template kept sending its default link-only design regardless of
+  what the template editor showed was saved — this hook sidesteps that entirely by building and
+  sending the email (through Resend) ourselves, so what's in the email is guaranteed to match
+  what the code actually needs.
